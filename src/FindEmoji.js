@@ -3,7 +3,7 @@ const { disableButtons, shuffleArray, formatMessage, ButtonBuilder } = require('
 const events = require('events');
 
 
-module.exports = class FindEmoji extends events {  
+module.exports = class FindEmoji extends events {
   constructor(options = {}) {
 
     if (!options.isSlashGame) options.isSlashGame = false;
@@ -56,8 +56,8 @@ module.exports = class FindEmoji extends events {
 
 
   async sendMessage(content) {
-    if (this.options.isSlashGame) return await this.message.editReply(content);
-    else return await this.message.channel.send(content);
+    if (this.options.isSlashGame) return await this.message.editReply(content).catch(e => {});
+    else return await this.message.channel.send(content).catch(e => {});
   }
 
 
@@ -76,7 +76,6 @@ module.exports = class FindEmoji extends events {
     .setColor(this.options.embed.color)
     .setTitle(this.options.embed.title)
     .setDescription(this.options.embed.description)
-    .setFooter({ text: this.message.author.tag, iconURL: this.message.author.displayAvatarURL({ dynamic: true }) });
     const msg = await this.sendMessage({ embeds: [embed], components: this.getComponents(true) });
 
 
@@ -115,8 +114,6 @@ module.exports = class FindEmoji extends events {
     .setColor(this.options.embed.color)
     .setTitle(this.options.embed.title)
     .setDescription(this.options[resultMessage+'Message'].replace('{emoji}', this.emoji))
-    .setFooter({ text: this.message.author.tag, iconURL: this.message.author.displayAvatarURL({ dynamic: true }) })
-
     return msg.edit({ embeds: [embed], components: disableButtons(this.getComponents(true)) });
   }
 
