@@ -128,7 +128,6 @@ module.exports = class Minesweeper extends events {
         .setColor(this.options.embed.color)
         .setTitle(this.options.embed.title)
         .setDescription(isTimeout ? this.options.timeoutMessage : (result ? this.options.winMessage : this.options.loseMessage))
-        .setAuthor({ name: this.message.author.tag, iconURL: this.message.author.displayAvatarURL({ dynamic: true }) });
 
     return msg.edit({ embeds: [embed], components: disableButtons(this.getComponents(true, result)) }).catch(() => {});
   }
@@ -229,3 +228,4 @@ module.exports = class Minesweeper extends events {
     return components;
   }
 }
+
