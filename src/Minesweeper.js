@@ -73,7 +73,7 @@ module.exports = class Minesweeper extends events {
     const embed = new EmbedBuilder()
         .setColor(this.options.embed.color)
         .setTitle(this.options.embed.title)
-        .setDescription(this.options.embed.description)
+        .setDescription(this.options.embed.description);
 
     const msg = await this.sendMessage({ embeds: [embed], components: this.getComponents() });
     return this.handleButtons(msg);
@@ -91,19 +91,28 @@ module.exports = class Minesweeper extends events {
         return;
       }
 
-      await btn.deferUpdate().catch(() => {});
-
-      const x = parseInt(btn.customId.split('_')[1]);
-      const y = parseInt(btn.customId.split('_')[2]);
+      const customIdParts = btn.customId.split('_');
+      const x = parseInt(customIdParts[1]);
+      const y = parseInt(customIdParts[2]);
       const index = (y * this.length + x);
 
-      if (this.gameBoard[index] === true) return collector.stop('mine');
+      if (typeof this.gameBoard[index] === 'number') {
+        return btn.deferUpdate().catch(() => {});
+      }
+
+      if (this.gameBoard[index] === true) {
+        await btn.deferUpdate().catch(() => {});
+        return collector.stop('mine');
+      }
 
       this.gameBoard[index] = this.getMinesAround(x, y);
 
-      if (this.foundAllMines()) return collector.stop('win');
+      if (this.foundAllMines()) {
+        await btn.deferUpdate().catch(() => {});
+        return collector.stop('win');
+      }
 
-      return await btn.editReply({ components: this.getComponents() }).catch(() => {});
+      return btn.update({ components: this.getComponents() }).catch(() => {});
     });
 
     collector.on('end', async (_, reason) => {
@@ -127,7 +136,7 @@ module.exports = class Minesweeper extends events {
     const embed = new EmbedBuilder()
         .setColor(this.options.embed.color)
         .setTitle(this.options.embed.title)
-        .setDescription(isTimeout ? this.options.timeoutMessage : (result ? this.options.winMessage : this.options.loseMessage))
+        .setDescription(isTimeout ? this.options.timeoutMessage : (result ? this.options.winMessage : this.options.loseMessage));
 
     return msg.edit({ embeds: [embed], components: disableButtons(this.getComponents(true, result)) }).catch(() => {});
   }
@@ -228,4 +237,3 @@ module.exports = class Minesweeper extends events {
     return components;
   }
 }
-
