@@ -2,20 +2,17 @@ const { EmbedBuilder, ActionRowBuilder } = require('discord.js');
 const { disableButtons, shuffleArray, formatMessage, ButtonBuilder } = require('../utils/utils');
 const events = require('events');
 
-
 module.exports = class FindEmoji extends events {
   constructor(options = {}) {
-
     if (!options.isSlashGame) options.isSlashGame = false;
     if (!options.message) throw new TypeError('NO_MESSAGE: No message option was provided.');
     if (typeof options.message !== 'object') throw new TypeError('INVALID_MESSAGE: message option must be an object.');
     if (typeof options.isSlashGame !== 'boolean') throw new TypeError('INVALID_COMMAND_TYPE: isSlashGame option must be a boolean.');
 
-
     if (!options.embed) options.embed = {};
     if (!options.embed.title) options.embed.title = 'Find Emoji';
     if (!options.embed.color) options.embed.color = '#5865F2';
-    if (!options.embed.description) options.embed.description = 'Remember the emojis from the board below.'
+    if (!options.embed.description) options.embed.description = 'Remember the emojis from the board below.';
     if (!options.embed.findDescription) options.embed.findDescription = 'Find the {emoji} emoji before the time runs out.';
 
     if (!options.timeoutTime) options.timeoutTime = 60000;
@@ -26,7 +23,6 @@ module.exports = class FindEmoji extends events {
     if (!options.winMessage) options.winMessage = 'You won! You selected the correct emoji. {emoji}';
     if (!options.loseMessage) options.loseMessage = 'You lost! You selected the wrong emoji. {emoji}';
     if (!options.timeoutMessage) options.timeoutMessage = 'You lost! You ran out of time. The emoji is {emoji}';
-
 
     if (typeof options.embed !== 'object') throw new TypeError('INVALID_EMBED: embed option must be an object.');
     if (typeof options.embed.title !== 'string') throw new TypeError('INVALID_EMBED: embed title must be a string.');
@@ -45,7 +41,6 @@ module.exports = class FindEmoji extends events {
       if (typeof options.playerOnlyMessage !== 'string') throw new TypeError('INVALID_MESSAGE: playerOnly Message option must be a string.');
     }
 
-
     super();
     this.options = options;
     this.message = options.message;
@@ -54,16 +49,14 @@ module.exports = class FindEmoji extends events {
     this.emoji = null;
   }
 
-
   async sendMessage(content) {
-    if (this.options.isSlashGame) return await this.message.editReply(content).catch(e => {});
-    else return await this.message.channel.send(content).catch(e => {});
+    if (this.options.isSlashGame) return await this.message.editReply(content).catch(() => {});
+    else return await this.message.channel.send(content).catch(() => {});
   }
-
 
   async startGame() {
     if (this.options.isSlashGame || !this.message.author) {
-      if (!this.message.deferred) await this.message.deferReply().catch(e => {});
+      if (!this.message.deferred) await this.message.deferReply().catch(() => {});
       this.message.author = this.message.user;
       this.options.isSlashGame = true;
     }
@@ -71,52 +64,61 @@ module.exports = class FindEmoji extends events {
     this.emojis = shuffleArray(this.emojis).slice(0, 8);
     this.emoji = this.emojis[Math.floor(Math.random() * this.emojis.length)];
 
-
     const embed = new EmbedBuilder()
-    .setColor(this.options.embed.color)
-    .setTitle(this.options.embed.title)
-    .setDescription(this.options.embed.description)
-    const msg = await this.sendMessage({ embeds: [embed], components: this.getComponents(true) });
+        .setColor(this.options.embed.color)
+        .setTitle(this.options.embed.title)
+        .setDescription(this.options.embed.description);
 
+    const msg = await this.sendMessage({ embeds: [embed], components: disableButtons(this.getComponents(true)) });
 
     setTimeout(async () => {
       embed.setDescription(this.options.embed.findDescription.replace('{emoji}', this.emoji));
-      await msg.edit({ embeds: [embed], components: this.getComponents(false) });
+      await msg.edit({ embeds: [embed], components: this.getComponents(false) }).catch(() => {});
+
       const collector = msg.createMessageComponentCollector({ idle: this.options.timeoutTime });
 
-
       collector.on('collect', async (btn) => {
-        await btn.deferUpdate().catch(e => {});
+        if (collector.ended) return btn.deferUpdate().catch(() => {});
+
         if (btn.user.id !== this.message.author.id) {
-          if (this.options.playerOnlyMessage) btn.followUp({ content: formatMessage(this.options, 'playerOnlyMessage'), ephemeral: true });
+          if (this.options.playerOnlyMessage) {
+            return btn.reply({ content: formatMessage(this.options, 'playerOnlyMessage'), ephemeral: true }).catch(() => {});
+          }
           return;
         }
-        this.selected = this.emojis[parseInt(btn.customId.split('_')[1])];
-        return collector.stop();
-      })
 
+        this.selected = this.emojis[parseInt(btn.customId.split('_')[1])];
+        collector.stop('handled');
+        return this.gameOver(msg, true, btn);
+      });
 
       collector.on('end', async (_, reason) => {
-        if (reason === 'idle' || reason === 'user') return this.gameOver(msg, (reason === 'user'));
-      })
+        if (reason === 'idle') return this.gameOver(msg, false);
+      });
     }, this.options.hideEmojiTime);
   }
 
-
-  gameOver(msg, result) {
+  gameOver(msg, result, btn = null) {
     const FindEmojiGame = { player: this.message.author, selectedEmoji: this.selected, correctEmoji: this.emoji };
     const resultMessage = result ? ((this.selected === this.emoji) ? 'win' : 'lose') : 'timeout';
+    
     this.emit('gameOver', { result: resultMessage, ...FindEmojiGame });
+    
     if (!result) this.selected = this.emoji;
 
-
     const embed = new EmbedBuilder()
-    .setColor(this.options.embed.color)
-    .setTitle(this.options.embed.title)
-    .setDescription(this.options[resultMessage+'Message'].replace('{emoji}', this.emoji))
-    return msg.edit({ embeds: [embed], components: disableButtons(this.getComponents(true)) });
-  }
+        .setColor(this.options.embed.color)
+        .setTitle(this.options.embed.title)
+        .setDescription(this.options[resultMessage + 'Message'].replace('{emoji}', this.emoji));
 
+    const finalComponents = disableButtons(this.getComponents(true));
+
+    if (btn) {
+      return btn.update({ embeds: [embed], components: finalComponents }).catch(() => {});
+    } else {
+      return msg.edit({ embeds: [embed], components: finalComponents }).catch(() => {});
+    }
+  }
 
   getComponents(showEmoji) {
     const components = [];
@@ -125,10 +127,13 @@ module.exports = class FindEmoji extends events {
       for (let y = 0; y < 4; y++) {
         const buttonEmoji = this.emojis[x * 4 + y];
 
-        const btn = new ButtonBuilder().setCustomId('findEmoji_' + (x*4 + y))
-        .setStyle(buttonEmoji === this.selected ? (this.selected === this.emoji ? 'SUCCESS' : 'DANGER') : this.options.buttonStyle);
+        const btn = new ButtonBuilder()
+            .setCustomId('findEmoji_' + (x * 4 + y))
+            .setStyle(buttonEmoji === this.selected ? (this.selected === this.emoji ? 'SUCCESS' : 'DANGER') : this.options.buttonStyle);
+        
         if (showEmoji) btn.setEmoji(buttonEmoji);
         else btn.setLabel('\u200b');
+        
         row.addComponents(btn);
       }
       components.push(row);
