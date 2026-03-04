@@ -84,6 +84,8 @@ module.exports = class Minesweeper extends events {
     const collector = msg.createMessageComponentCollector({ idle: this.options.timeoutTime });
 
     collector.on('collect', async btn => {
+      if (collector.ended) return btn.deferUpdate().catch(() => {});
+
       if (btn.user.id !== this.message.author.id) {
         if (this.options.playerOnlyMessage) {
           return btn.reply({ content: formatMessage(this.options, 'playerOnlyMessage'), ephemeral: true }).catch(() => {});
@@ -101,28 +103,28 @@ module.exports = class Minesweeper extends events {
       }
 
       if (this.gameBoard[index] === true) {
-        await btn.deferUpdate().catch(() => {});
-        return collector.stop('mine');
+        collector.stop('mine');
+        return this.gameOver(msg, false, false, btn);
       }
 
       this.gameBoard[index] = this.getMinesAround(x, y);
 
       if (this.foundAllMines()) {
-        await btn.deferUpdate().catch(() => {});
-        return collector.stop('win');
+        collector.stop('win');
+        return this.gameOver(msg, true, false, btn);
       }
 
       return btn.update({ components: this.getComponents() }).catch(() => {});
     });
 
     collector.on('end', async (_, reason) => {
-      if (['win', 'mine', 'user', 'idle'].includes(reason)) {
-        return this.gameOver(msg, this.foundAllMines(), reason === 'idle');
+      if (reason === 'idle') {
+        return this.gameOver(msg, this.foundAllMines(), true);
       }
     });
   }
 
-  gameOver(msg, result, isTimeout = false) {
+  gameOver(msg, result, isTimeout = false, btn = null) {
     const MinesweeperGame = { player: this.message.author, blocksTurned: this.gameBoard.filter(Number.isInteger).length };
     this.emit('gameOver', { result: isTimeout ? 'timeout' : (result ? 'win' : 'lose'), ...MinesweeperGame });
 
@@ -138,7 +140,13 @@ module.exports = class Minesweeper extends events {
         .setTitle(this.options.embed.title)
         .setDescription(isTimeout ? this.options.timeoutMessage : (result ? this.options.winMessage : this.options.loseMessage));
 
-    return msg.edit({ embeds: [embed], components: disableButtons(this.getComponents(true, result)) }).catch(() => {});
+    const finalComponents = disableButtons(this.getComponents(true, result));
+
+    if (btn) {
+      return btn.update({ embeds: [embed], components: finalComponents }).catch(() => {});
+    } else {
+      return msg.edit({ embeds: [embed], components: finalComponents }).catch(() => {});
+    }
   }
 
   plantMines() {
