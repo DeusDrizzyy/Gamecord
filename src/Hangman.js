@@ -77,7 +77,7 @@ module.exports = class Hangman extends events {
             `┃      ${this.damage > 2 ? this.hangman.shirt : ''}`,
             `┃      ${this.damage > 3 ? this.hangman.pants : ''}`,
             `┃     ${this.damage > 4 ? this.hangman.boots : ''}`,
-            '┗━━━━━━━━━━━━━━━',
+            '┗━━━━━━━━━━━━━',
             '```',
         ].join('\n');
     }
